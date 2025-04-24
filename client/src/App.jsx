@@ -5,6 +5,7 @@ import ThemeToggle from './ThemeToggle';
 import ExplorerIcon from './ExplorerIcon';
 import SettingsIcon from './SettingsIcon';
 import SettingsPanel from './SettingsPanel';
+import RunModeModal from './RunModeModal';
 
 function fetchFilesByLanguage() {
   return fetch('/api/files-by-language').then(r => r.json());
@@ -14,6 +15,13 @@ function fetchFileContent(path) {
 }
 function runFile(path) {
   return fetch('/api/run', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path })
+  }).then(r => r.json());
+}
+function runFileHidden(path) {
+  return fetch('/api/runhidden', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ path })
@@ -89,6 +97,8 @@ export default function App() {
   const [wrap, setWrap] = useState(true);
   const [showLineNumbers, setShowLineNumbers] = useState(false);
   const [theme, setTheme] = useState('dark');
+  const [runModalOpen, setRunModalOpen] = useState(false);
+  const [pendingRun, setPendingRun] = useState(null);
   const searchTimeout = useRef();
 
   useEffect(() => {
@@ -131,12 +141,29 @@ export default function App() {
     setSearchActive(false);
   };
 
-  const handleRun = async () => {
-    setRunResult(null);
+  const handleRun = () => {
+    setRunModalOpen(true);
+    setPendingRun(selected);
+  };
+
+  const handleRunModeSelect = async (mode) => {
+    setRunModalOpen(false);
     setLoading(true);
-    const result = await runFile(selected);
+    setRunResult(null);
+    let result = null;
+    if (mode === 'cmd') {
+      result = await runFile(pendingRun);
+    } else {
+      result = await runFileHidden(pendingRun);
+    }
     setRunResult(result);
     setLoading(false);
+    setPendingRun(null);
+  };
+
+  const handleRunModalClose = () => {
+    setRunModalOpen(false);
+    setPendingRun(null);
   };
 
   const handleOpenCmd = async () => {
@@ -268,6 +295,11 @@ export default function App() {
         setShowLineNumbers={setShowLineNumbers}
         theme={theme}
         setTheme={setTheme}
+      />
+      <RunModeModal
+        visible={runModalOpen}
+        onSelect={handleRunModeSelect}
+        onClose={handleRunModalClose}
       />
     </div>
   );

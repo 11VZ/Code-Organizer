@@ -166,6 +166,41 @@ app.post('/api/run', (req, res) => {
   res.json({ success: true, message: 'Opened CMD and ran the file.' });
 });
 
+app.post('/api/runhidden', (req, res) => {
+  const relPath = req.body.path;
+  if (!relPath) return res.status(400).send('No path');
+  const absPath = path.join(__dirname, 'code', relPath);
+  if (!fs.existsSync(absPath)) return res.status(404).send('Not found');
+  const dir = path.dirname(absPath);
+  const ext = path.extname(absPath).slice(1).toLowerCase();
+  let cmdStr;
+  if (ext === 'py') {
+    cmdStr = `python "${absPath}"`;
+  } else if (ext === 'js') {
+    cmdStr = `node "${absPath}"`;
+  } else if (ext === 'bat') {
+    cmdStr = `"${absPath}"`;
+  } else if (ext === 'sh') {
+    cmdStr = `bash "${absPath}"`;
+  } else if (ext === 'java') {
+    const javaFile = path.basename(absPath);
+    const className = javaFile.replace(/\.[^.]+$/, '');
+    cmdStr = `javac "${absPath}" && java -cp "${dir}" ${className}`;
+  } else {
+    cmdStr = `"${absPath}"`;
+  }
+  const child = require('child_process').spawn(cmdStr, { cwd: dir, shell: true });
+  let stdout = '', stderr = '';
+  if (child.stdout) child.stdout.on('data', d => { stdout += d.toString(); });
+  if (child.stderr) child.stderr.on('data', d => { stderr += d.toString(); });
+  child.on('close', code => {
+    res.json({ success: code === 0, stdout, stderr, code });
+  });
+  child.on('error', err => {
+    res.status(500).json({ success: false, error: err.message });
+  });
+});
+
 app.post('/api/opencmd', (req, res) => {
   const relPath = req.body.path;
   if (!relPath) return res.status(400).send('No path');
